@@ -10,7 +10,6 @@
 #define PAUSE()  do { printf("Press any key to continue . . ."); getchar(); } while (0)
 /*
 Improvments TBD:
-
 - If we want to improve the q learning function we must add random exploration with probability epsilon
 at each step. Currently the agent takes the best action based on what it knows so far.
 - Provable to converge to real q* as long as policy allows for some random "exploration"
