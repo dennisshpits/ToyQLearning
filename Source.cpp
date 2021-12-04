@@ -133,7 +133,6 @@ vector<int> TakePathToPosition(vector<Action*> a, State * s, int winningposition
 		randomAction = -1;
 		map<string, string> pastActions;
 
-		//for (const auto anaction : a) {
 		while (allactionsexplored != true){
 
 			randomAction = (rand() % a.size());
@@ -165,8 +164,6 @@ vector<int> TakePathToPosition(vector<Action*> a, State * s, int winningposition
 						} else {
 							stuckcount++;
 						}
-
-
 					}
 
 					if (stuckcount == a.size()) {
@@ -222,11 +219,30 @@ vector<int> TakePathToPosition(vector<Action*> a, State * s, int winningposition
 
 int main() {
 
-	int rows = 2;
-	int columns = 3;
+	int rows = 4;
+	int columns = 4;
 	int start = 1;
-	int finish = 3;
+	int finish = 16;
 	//ask user to input rows and columns and start
+
+	int num_threads = 1;
+	#ifdef _OPENMP
+		num_threads = 4;
+		omp_set_num_threads(num_threads);
+		char *hasCancel = getenv("OMP_CANCELLATION");
+		if (hasCancel == nullptr) {
+			cout << "Warning! cancel construct not set please run: (export OMP_CANCELLATION=true)" << endl;
+		}
+	#endif
+
+	#pragma omp parallel
+    {
+        #pragma omp single nowait 
+        {
+			cout << "OpenMP cancellation = " << omp_get_cancellation() << endl;
+			cout << "Number of threads = " << omp_get_num_threads() << endl;
+        }
+    }
 
 	State s(rows, columns, start);
 
@@ -266,12 +282,18 @@ int main() {
 	//in the beginning our q table is empty
 	map<int,map<string, double>> q;
 
+	#pragma omp parallel for
 	for (int i = 1;i <= rows * columns;i++) {
 		map<string, double> newmap;
 		for (const auto anaction : av) {
 			newmap[anaction->GetName()] = 0;
 		}
 		q[i] = newmap;
+		#pragma omp critical
+		{
+			int thread_ID = omp_get_thread_num();
+			cout << "Thread " + to_string(thread_ID) + " added: " << i << " to q table" << endl;
+		}
 	}
 
 	////////////////////QLearning//////////////////

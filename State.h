@@ -1,6 +1,8 @@
 #pragma once
 #include <iomanip>
-#include<iostream>
+#include <iostream>
+// We only include omp.h in State since State is included everywhere else in the project
+#include <omp.h>
 
 using namespace std;
 
@@ -56,27 +58,51 @@ public:
 		return matrix[row][col];
 	}
 
+	// we can use openmp to search the row number
+	// we are given a cell/grid value and we need to return the row location
+	// OMP_CANCELLATION must be set
 	int getcurrentrow() {
 		int row = -1;
+		int i;
+
+		#pragma omp parallel for private(i)
 		for (int j = 0; j < r;j++) {
-			for (int i = 0;i < c;i++) {
+			for (i = 0;i < c;i++) {
+				
+				// if a thread encounters a cancellation point, it checks if omp cancel was called
+				#pragma omp cancellation point for
+
 				if (matrix[j][i] == currentposition) {
+					// since we expect only one thread to access row, there should be no race conditions
 					row = j;
-					break;
+
+					// we want to stop all other threads
+					// parallel break statement
+					#pragma omp cancel for
+					
+					// we no longer need the break statment
+					//break;
 				}
 			}
 		}
-
+ 
 		return row;
 	}
 
 	int getcurrentcol() {
 		int col = -1;
+		int i;
+
+		#pragma omp parallel for private(i)
 		for (int j = 0; j < r;j++) {
-			for (int i = 0;i < c;i++) {
+			for (i = 0;i < c;i++) {
+				
+				#pragma omp cancellation point for
+
 				if (matrix[j][i] == currentposition) {
 					col = i;
-					break;
+					#pragma omp cancel for
+					//break;
 				}
 			}
 		}
