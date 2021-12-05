@@ -231,7 +231,6 @@ vector<int> TakePathToPosition(vector<Action*> a, State * s, int winningposition
 	return retvec;
 }
 
-
 int main() {
 
 	int rows = 4;
@@ -239,7 +238,6 @@ int main() {
 	int start = 1;
 	int finish = 16;
 	int const ITERATIONS = 50;
-	//ask user to input rows and columns and start
 
 	int num_threads = 1;
 	#ifdef _OPENMP
@@ -318,7 +316,7 @@ int main() {
 	cp=TakePathToPosition(av, &s, finish, &q);
 	omp_destroy_lock(&q_table_lock);
 
-	cout << "The q after 10 iteration:" << endl;
+	cout << "The q table after " << ITERATIONS << " iterations:" << endl;
 	printqmatrix(q, av);
 
 	cout << "The chosen path:" << endl;
