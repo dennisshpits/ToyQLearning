@@ -10,7 +10,6 @@
 #define PAUSE()  do { printf("Press any key to continue . . ."); getchar(); } while (0)
 /*
 Improvments TBD:
-
 - If we want to improve the q learning function we must add random exploration with probability epsilon
 at each step. Currently the agent takes the best action based on what it knows so far.
 - Provable to converge to real q* as long as policy allows for some random "exploration"
@@ -150,9 +149,21 @@ vector<int> TakePathToPosition(vector<Action*> a, State * s, int winningposition
 			currentq = qtable->find(mystate.CurrentPosition())->second.find(anaction->GetName())->second;
 
 			if (anaction->NextPositionValid(&mystate)) {
-				if (past.find(anaction->GetNextPosition(&mystate)) != past.end()) { //dont move back to old position
-					//check if all possible actions lead to a past position
+				//dont move back to old position, but check if we are stuck
+				if (past.find(anaction->GetNextPosition(&mystate)) != past.end()) {
 					
+					/*
+						We need to check if the agent is stuck.
+						This means that we need to check if all possible next actions the agent takes
+						leads to a position that is not valid or already explored.
+
+						For example if our grid is:
+						1 2 3
+						4 5 6
+						And the agent has moved 1->2->5->4 then the agent is now stuck
+
+						If the agent is stuck we have to end the episode
+					*/
 					stuckcount = 0;
 					for (const auto theaction : a) { //loop through all actions
 						if (theaction->NextPositionValid(&mystate)) {
@@ -223,6 +234,7 @@ int main() {
 	int columns = 4;
 	int start = 1;
 	int finish = 16;
+	int const ITERATIONS = 50;
 	//ask user to input rows and columns and start
 
 	int num_threads = 1;
@@ -236,13 +248,13 @@ int main() {
 	#endif
 
 	#pragma omp parallel
-    {
-        #pragma omp single nowait 
-        {
+	{
+		#pragma omp single nowait 
+		{
 			cout << "OpenMP cancellation = " << omp_get_cancellation() << endl;
 			cout << "Number of threads = " << omp_get_num_threads() << endl;
-        }
-    }
+		}
+	}
 
 	State s(rows, columns, start);
 
@@ -289,16 +301,11 @@ int main() {
 			newmap[anaction->GetName()] = 0;
 		}
 		q[i] = newmap;
-		#pragma omp critical
-		{
-			int thread_ID = omp_get_thread_num();
-			cout << "Thread " + to_string(thread_ID) + " added: " << i << " to q table" << endl;
-		}
 	}
 
 	////////////////////QLearning//////////////////
 	vector<int> cp;
-	for (int i = 0; i < 15; i++) {
+	for (int i = 0; i < ITERATIONS; i++) {
 		cp=TakePathToPosition(av, &s, finish, &q);
 	}
 
