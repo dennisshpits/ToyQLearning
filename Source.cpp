@@ -8,16 +8,9 @@
 #include"State.h"
 #include"Action.h"
 #define PAUSE()  do { printf("Press any key to continue . . ."); getchar(); } while (0)
-/*
-Improvments TBD:
-
-- If we want to improve the q learning function we must add random exploration with probability epsilon
-at each step. Currently the agent takes the best action based on what it knows so far.
-- Provable to converge to real q* as long as policy allows for some random "exploration"
-- Can turn off exploration once we believe the algorithim has converged and start "exploiting" the policy.
-*/
 
 using namespace std;
+omp_lock_t q_table_lock;
 
 struct Node {
 public:	
@@ -133,7 +126,6 @@ vector<int> TakePathToPosition(vector<Action*> a, State * s, int winningposition
 		randomAction = -1;
 		map<string, string> pastActions;
 
-		//for (const auto anaction : a) {
 		while (allactionsexplored != true){
 
 			randomAction = (rand() % a.size());
@@ -147,26 +139,39 @@ vector<int> TakePathToPosition(vector<Action*> a, State * s, int winningposition
 			if (pastActions.size() == a.size()) {
 				allactionsexplored = true;
 			}
-
+			omp_set_lock(&q_table_lock);
 			currentq = qtable->find(mystate.CurrentPosition())->second.find(anaction->GetName())->second;
+			omp_unset_lock(&q_table_lock);
 
 			if (anaction->NextPositionValid(&mystate)) {
-				if (past.find(anaction->GetNextPosition(&mystate)) != past.end()) { //dont move back to old position
-					//check if all possible actions lead to a past position
+				//dont move back to old position, but check if we are stuck
+				if (past.find(anaction->GetNextPosition(&mystate)) != past.end()) {
 					
+					/*
+						We need to check if the agent is stuck.
+						This means that we need to check if all possible next actions the agent takes
+						leads to a position that is not valid or already explored.
+
+						For example if our grid is:
+						1 2 3
+						4 5 6
+						And the agent has moved 1->2->5->4 then the agent is now stuck
+
+						If the agent is stuck we have to end the episode
+					*/
 					stuckcount = 0;
+					#pragma omp parallel for reduction(+ : stuckcount)
 					for (const auto theaction : a) { //loop through all actions
 						if (theaction->NextPositionValid(&mystate)) {
 							if (past.find(theaction->GetNextPosition(&mystate)) == past.end()) {
-								break; // we are not stuck, we have more options
+								//break; // we are not stuck, we have more options
+								#pragma omp cancel for
 							} else {
 								stuckcount++;
 							}
 						} else {
 							stuckcount++;
 						}
-
-
 					}
 
 					if (stuckcount == a.size()) {
@@ -198,7 +203,11 @@ vector<int> TakePathToPosition(vector<Action*> a, State * s, int winningposition
 		if (takeaction->NextPositionValid(&mystate) == true) {
 			//find max action
 			for (const auto actionprime : a) { //loop through all actions
+				
+				omp_set_lock(&q_table_lock);
 				valuefunctionstateplusone = qtable->find(takeaction->GetNextPosition(&mystate))->second.find(actionprime->GetName())->second;
+				omp_unset_lock(&q_table_lock);
+
 				if (valuefunctionstateplusone > maxaction) {
 					maxaction = valuefunctionstateplusone;
 					vprime = valuefunctionstateplusone;
@@ -206,7 +215,9 @@ vector<int> TakePathToPosition(vector<Action*> a, State * s, int winningposition
 			}
 		}
 
+		omp_set_lock(&q_table_lock);
 		qtable->find(mystate.CurrentPosition())->second.find(takeaction->GetName())->second = ( (1- alpha) * qtable->find(mystate.CurrentPosition())->second.find(takeaction->GetName())->second) + (alpha * (reward + vprime));
+		omp_unset_lock(&q_table_lock);
 
 		if (takeaction->NextPositionValid(&mystate) == true) {
 			past[mystate.CurrentPosition()] = mystate.CurrentPosition();
@@ -222,11 +233,30 @@ vector<int> TakePathToPosition(vector<Action*> a, State * s, int winningposition
 
 int main() {
 
-	int rows = 2;
-	int columns = 3;
+	int rows = 4;
+	int columns = 4;
 	int start = 1;
-	int finish = 3;
-	//ask user to input rows and columns and start
+	int finish = 16;
+	int const ITERATIONS = 50;
+
+	int num_threads = 1;
+	#ifdef _OPENMP
+		num_threads = 20;
+		omp_set_num_threads(num_threads);
+		char *hasCancel = getenv("OMP_CANCELLATION");
+		if (hasCancel == nullptr) {
+			cout << "Warning! cancel construct not set please run: (export OMP_CANCELLATION=true)" << endl;
+		}
+	#endif
+
+	#pragma omp parallel
+	{
+		#pragma omp single nowait 
+		{
+			cout << "OpenMP cancellation = " << omp_get_cancellation() << endl;
+			cout << "Number of threads = " << omp_get_num_threads() << endl;
+		}
+	}
 
 	State s(rows, columns, start);
 
@@ -266,6 +296,7 @@ int main() {
 	//in the beginning our q table is empty
 	map<int,map<string, double>> q;
 
+	#pragma omp parallel for
 	for (int i = 1;i <= rows * columns;i++) {
 		map<string, double> newmap;
 		for (const auto anaction : av) {
@@ -275,12 +306,17 @@ int main() {
 	}
 
 	////////////////////QLearning//////////////////
-	vector<int> cp;
-	for (int i = 0; i < 15; i++) {
-		cp=TakePathToPosition(av, &s, finish, &q);
+	omp_init_lock(&q_table_lock);
+	#pragma omp parallel for schedule(dynamic, 10)
+	for (int i = 0; i < ITERATIONS; i++) {
+		TakePathToPosition(av, &s, finish, &q);
 	}
 
-	cout << "The q after 10 iteration:" << endl;
+	vector<int> cp;
+	cp=TakePathToPosition(av, &s, finish, &q);
+	omp_destroy_lock(&q_table_lock);
+
+	cout << "The q table after " << ITERATIONS << " iterations:" << endl;
 	printqmatrix(q, av);
 
 	cout << "The chosen path:" << endl;
