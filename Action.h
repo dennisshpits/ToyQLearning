@@ -7,7 +7,6 @@ public:
 	virtual int GetNextPosition(State * s) = 0;
 	virtual bool NextPositionValid(State * s) = 0;
 	virtual string GetName() = 0;
-	//virtual ostream& operator<<(ostream& os, const Action& dt);
 
 	string name;
 	int penalty;

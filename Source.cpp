@@ -109,7 +109,7 @@ vector<int> TakePathToPosition(vector<Action*> a, State mystate, int winningposi
 	map<int, int> past;
 	// srand needed for random_shuffle
 	srand(time(NULL));
-	bool allactionsexplored = false;
+	
 	bool ignoreaction = false;
 	bool stuck = false;
 	int stuckcount = 0;
@@ -122,78 +122,60 @@ vector<int> TakePathToPosition(vector<Action*> a, State mystate, int winningposi
 		takeaction = nullptr;
 		currentq = 0;
 		reward = 0;
-		allactionsexplored = false;
-		map<string, string> pastActions;
 
 		// randomly shuffle the action vector so that the agent chooses a random action when exploring all possible actions
 		random_shuffle(a.begin(),a.end());
 		
-		while (allactionsexplored != true){
+		for (const auto anaction : a) {
+			ignoreaction = false;
 
-			if (stuck == true) {
-				break;
-			}
+			omp_set_lock(&q_table_lock);
+			currentq = qtable->find(mystate.CurrentPosition())->second.find(anaction->GetName())->second;
+			omp_unset_lock(&q_table_lock);
 
-			for (const auto anaction : a) {
-				ignoreaction = false;
+			if (anaction->NextPositionValid(&mystate)) {
+				//dont move back to old position, but check if we are stuck
+				if (past.find(anaction->GetNextPosition(&mystate)) != past.end()) {
+					// TBD maybe move this logic into a class
+					/*
+						We need to check if the agent is stuck.
+						This means that we need to check if all possible next actions the agent takes
+						leads to a position that is not valid or already explored.
 
-				if (pastActions.find(anaction->GetName()) != pastActions.end()) { //dont move back to old action
-					cout << "Tried to move back to old action" << endl;
-				} else {
-					pastActions[anaction->GetName()] = anaction->GetName();
-				}
+						For example if our grid is:
+						1 2 3
+						4 5 6
+						And the agent has moved 1->2->5->4 then the agent is now stuck
 
-				if (pastActions.size() == a.size()) {
-					allactionsexplored = true;
-				}
-				omp_set_lock(&q_table_lock);
-				currentq = qtable->find(mystate.CurrentPosition())->second.find(anaction->GetName())->second;
-				omp_unset_lock(&q_table_lock);
-
-				if (anaction->NextPositionValid(&mystate)) {
-					//dont move back to old position, but check if we are stuck
-					if (past.find(anaction->GetNextPosition(&mystate)) != past.end()) {
-						// TBD maybe move this into a class
-						/*
-							We need to check if the agent is stuck.
-							This means that we need to check if all possible next actions the agent takes
-							leads to a position that is not valid or already explored.
-
-							For example if our grid is:
-							1 2 3
-							4 5 6
-							And the agent has moved 1->2->5->4 then the agent is now stuck
-
-							If the agent is stuck we have to end the episode
-						*/
-						stuckcount = 0;
-						#pragma omp parallel for reduction(+ : stuckcount)
-						for (const auto theaction : a) { //loop through all actions
-							if (theaction->NextPositionValid(&mystate)) {
-								if (past.find(theaction->GetNextPosition(&mystate)) == past.end()) {
-									//break; // we are not stuck, we have more options
-									#pragma omp cancel for
-								} else {
-									stuckcount++;
-								}
+						If the agent is stuck we have to end the episode
+					*/
+					stuckcount = 0;
+					#pragma omp parallel for reduction(+ : stuckcount)
+					for (const auto theaction : a) { //loop through all actions
+						if (theaction->NextPositionValid(&mystate)) {
+							if (past.find(theaction->GetNextPosition(&mystate)) == past.end()) {
+								//break; // we are not stuck, we have more options
+								#pragma omp cancel for
 							} else {
 								stuckcount++;
 							}
+						} else {
+							stuckcount++;
 						}
-
-						if (stuckcount == a.size()) {
-							stuck = true;
-							break;
-						}
-						
-						ignoreaction = true;
 					}
-				}
 
-				if (currentq > qmax && ignoreaction == false) {
-					qmax = currentq;
-					takeaction = anaction;
+					if (stuckcount == a.size()) {
+						stuck = true;
+						break;
+					}
+					
+					continue;
 				}
+			}
+
+			if (currentq > qmax) {
+				qmax = currentq;
+				takeaction = anaction;
 			}
 		}
 
