@@ -33,6 +33,25 @@ public:
 		delete[] matrix;
 	}
 
+	//copy constructor
+	State(const State & obj) {
+		r = obj.r; // copy the value
+		c = obj.c;
+		currentposition = obj.currentposition;
+
+		matrix = new int*[r];
+		for (int i = 0;i < r;i++) {
+			matrix[i] = new int[c];
+		}
+		int assignnum = 1;
+		for (int j = 0; j < r;j++) {
+			for (int i = 0;i < c;i++) {
+				matrix[j][i] = assignnum;
+				assignnum++;
+			}
+		}
+	}
+
 	void printmatrix() {
 		const char separator = ' ';
 		const int width = 4;

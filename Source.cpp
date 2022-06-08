@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <cstdlib>
 #include <ctime>
+#include <algorithm>
 #include"State.h"
 #include"Action.h"
 #define PAUSE()  do { printf("Press any key to continue . . ."); getchar(); } while (0)
@@ -97,10 +98,8 @@ void BuildTree(MyTree * t, vector<Action*> a, State * s, int startposition) {
 //Call q function
 //An episode ends when an agent finds a success.
 //This is called episodic learning
-vector<int> TakePathToPosition(vector<Action*> a, State * s, int winningposition, map<int, map<string, double>> * qtable) {
+vector<int> TakePathToPosition(vector<Action*> a, State mystate, int winningposition, map<int, map<string, double>> * qtable) {
 	double alpha = 0.5; //learning rate (0 is q table never changes, 1 adopt new observation and throw away what you knew before)
-	State mystate(s->Rows(), s->Columns(), s->CurrentPosition());
-	//ways to update
 	
 	//choose an action to take based off of q table
 	double qmax = -1000;
@@ -108,9 +107,10 @@ vector<int> TakePathToPosition(vector<Action*> a, State * s, int winningposition
 	double currentq = 0;
 	int reward = 0;
 	map<int, int> past;
+	// srand needed for random_shuffle
 	srand(time(NULL));
 	bool allactionsexplored = false;
-	int randomAction = -1;
+	bool ignoreaction = false;
 	bool stuck = false;
 	int stuckcount = 0;
 	double valuefunctionstateplusone = 0;
@@ -123,69 +123,77 @@ vector<int> TakePathToPosition(vector<Action*> a, State * s, int winningposition
 		currentq = 0;
 		reward = 0;
 		allactionsexplored = false;
-		randomAction = -1;
 		map<string, string> pastActions;
 
+		// randomly shuffle the action vector so that the agent chooses a random action when exploring all possible actions
+		random_shuffle(a.begin(),a.end());
+		
 		while (allactionsexplored != true){
 
-			randomAction = (rand() % a.size());
-			auto anaction = a[randomAction];
-			if (pastActions.find(anaction->GetName()) != pastActions.end()) { //dont move back to old action
-				continue;
-			} else {
-				pastActions[anaction->GetName()] = anaction->GetName();
+			if (stuck == true) {
+				break;
 			}
 
-			if (pastActions.size() == a.size()) {
-				allactionsexplored = true;
-			}
-			omp_set_lock(&q_table_lock);
-			currentq = qtable->find(mystate.CurrentPosition())->second.find(anaction->GetName())->second;
-			omp_unset_lock(&q_table_lock);
+			for (const auto anaction : a) {
+				ignoreaction = false;
 
-			if (anaction->NextPositionValid(&mystate)) {
-				//dont move back to old position, but check if we are stuck
-				if (past.find(anaction->GetNextPosition(&mystate)) != past.end()) {
-					
-					/*
-						We need to check if the agent is stuck.
-						This means that we need to check if all possible next actions the agent takes
-						leads to a position that is not valid or already explored.
+				if (pastActions.find(anaction->GetName()) != pastActions.end()) { //dont move back to old action
+					cout << "Tried to move back to old action" << endl;
+				} else {
+					pastActions[anaction->GetName()] = anaction->GetName();
+				}
 
-						For example if our grid is:
-						1 2 3
-						4 5 6
-						And the agent has moved 1->2->5->4 then the agent is now stuck
+				if (pastActions.size() == a.size()) {
+					allactionsexplored = true;
+				}
+				omp_set_lock(&q_table_lock);
+				currentq = qtable->find(mystate.CurrentPosition())->second.find(anaction->GetName())->second;
+				omp_unset_lock(&q_table_lock);
 
-						If the agent is stuck we have to end the episode
-					*/
-					stuckcount = 0;
-					#pragma omp parallel for reduction(+ : stuckcount)
-					for (const auto theaction : a) { //loop through all actions
-						if (theaction->NextPositionValid(&mystate)) {
-							if (past.find(theaction->GetNextPosition(&mystate)) == past.end()) {
-								//break; // we are not stuck, we have more options
-								#pragma omp cancel for
+				if (anaction->NextPositionValid(&mystate)) {
+					//dont move back to old position, but check if we are stuck
+					if (past.find(anaction->GetNextPosition(&mystate)) != past.end()) {
+						// TBD maybe move this into a class
+						/*
+							We need to check if the agent is stuck.
+							This means that we need to check if all possible next actions the agent takes
+							leads to a position that is not valid or already explored.
+
+							For example if our grid is:
+							1 2 3
+							4 5 6
+							And the agent has moved 1->2->5->4 then the agent is now stuck
+
+							If the agent is stuck we have to end the episode
+						*/
+						stuckcount = 0;
+						#pragma omp parallel for reduction(+ : stuckcount)
+						for (const auto theaction : a) { //loop through all actions
+							if (theaction->NextPositionValid(&mystate)) {
+								if (past.find(theaction->GetNextPosition(&mystate)) == past.end()) {
+									//break; // we are not stuck, we have more options
+									#pragma omp cancel for
+								} else {
+									stuckcount++;
+								}
 							} else {
 								stuckcount++;
 							}
-						} else {
-							stuckcount++;
 						}
-					}
 
-					if (stuckcount == a.size()) {
-						stuck = true;
-						break;
+						if (stuckcount == a.size()) {
+							stuck = true;
+							break;
+						}
+						
+						ignoreaction = true;
 					}
-					
-					continue;
 				}
-			}
 
-			if (currentq > qmax) {
-				qmax = currentq;
-				takeaction = anaction;
+				if (currentq > qmax && ignoreaction == false) {
+					qmax = currentq;
+					takeaction = anaction;
+				}
 			}
 		}
 
@@ -289,7 +297,6 @@ int main() {
 		}
 		cout << "Success:" << pathtaken << endl;
 	}
-
 	
 	//Our goal here is to learn the q function q(s,a) where s is a state and a is an action
 	//lets create our q table
@@ -309,11 +316,11 @@ int main() {
 	omp_init_lock(&q_table_lock);
 	#pragma omp parallel for schedule(dynamic, 10)
 	for (int i = 0; i < ITERATIONS; i++) {
-		TakePathToPosition(av, &s, finish, &q);
+		TakePathToPosition(av, s, finish, &q);
 	}
 
 	vector<int> cp;
-	cp=TakePathToPosition(av, &s, finish, &q);
+	cp=TakePathToPosition(av, s, finish, &q);
 	omp_destroy_lock(&q_table_lock);
 
 	cout << "The q table after " << ITERATIONS << " iterations:" << endl;

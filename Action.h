@@ -7,6 +7,7 @@ public:
 	virtual int GetNextPosition(State * s) = 0;
 	virtual bool NextPositionValid(State * s) = 0;
 	virtual string GetName() = 0;
+	//virtual ostream& operator<<(ostream& os, const Action& dt);
 
 	string name;
 	int penalty;
@@ -28,6 +29,10 @@ public:
 
 		return 0;
 	}
+
+	// Overloading the << Operator.
+	// The overloaded << operator function must then be declared as a friend of class Action so it can access the private data.
+	friend ostream& operator<<(ostream& os, Action * dt);
 
 protected:
 
@@ -116,3 +121,9 @@ public:
 	}
 	string GetName() { return this->name; }
 };
+
+ostream& operator<<(ostream& os, Action * dt)
+{
+    os << dt->GetName();
+    return os;
+}
