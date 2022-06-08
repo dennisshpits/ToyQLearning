@@ -109,8 +109,6 @@ vector<int> TakePathToPosition(vector<Action*> a, State mystate, int winningposi
 	map<int, int> past;
 	// srand needed for random_shuffle
 	srand(time(NULL));
-	
-	bool ignoreaction = false;
 	bool stuck = false;
 	int stuckcount = 0;
 	double valuefunctionstateplusone = 0;
@@ -127,7 +125,6 @@ vector<int> TakePathToPosition(vector<Action*> a, State mystate, int winningposi
 		random_shuffle(a.begin(),a.end());
 		
 		for (const auto anaction : a) {
-			ignoreaction = false;
 
 			omp_set_lock(&q_table_lock);
 			currentq = qtable->find(mystate.CurrentPosition())->second.find(anaction->GetName())->second;
