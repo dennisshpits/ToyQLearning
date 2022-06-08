@@ -29,6 +29,10 @@ public:
 		return 0;
 	}
 
+	// Overloading the << Operator.
+	// The overloaded << operator function must then be declared as a friend of class Action so it can access the private data.
+	friend ostream& operator<<(ostream& os, Action * dt);
+
 protected:
 
 	bool nextpositionvalid(int r, int c, int newrow, int newcol) {
@@ -116,3 +120,9 @@ public:
 	}
 	string GetName() { return this->name; }
 };
+
+ostream& operator<<(ostream& os, Action * dt)
+{
+    os << dt->GetName();
+    return os;
+}
