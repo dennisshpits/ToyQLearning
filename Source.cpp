@@ -45,8 +45,6 @@ private:
 	}
 };
 
-
-
 template <class T>
 void printmatrix(T** m, int r, int c) {
 	const char separator = ' ';
@@ -64,7 +62,7 @@ void printqmatrix(map<int, map<string, double>> myq, vector<Action*> a) {
 	const char separator = ' ';
 	const int width = 8;
 
-	for (int i = 1;i <= myq.size() ;i++) {
+	for (long unsigned int i = 1;i <= myq.size() ;i++) {
 		for (const auto anaction : a) {
 			cout << left << setw(width) << setfill(separator) << myq[i][anaction->GetName()];
 		}
@@ -95,6 +93,41 @@ void BuildTree(MyTree * t, vector<Action*> a, State * s, int startposition) {
 	addnode(t->root,a, s, parentpositions);
 }
 
+/*
+	We need to check if the agent is stuck.
+	This means that we need to check if all possible next actions the agent takes
+	leads to a position that is not valid or already explored.
+
+	For example if our grid is:
+	1 2 3
+	4 5 6
+	And the agent has moved 1->2->5->4 then the agent is now stuck
+
+	If the agent is stuck we have to end the episode
+*/
+bool stuckChecker(const map<int, int> & past_positions, State * s, const vector<Action*> & a){
+	long unsigned int stuckcount = 0;
+	#pragma omp parallel for reduction(+ : stuckcount)
+	for (const auto theaction : a) { //loop through all actions
+		if (theaction->NextPositionValid(s)) {
+			if (past_positions.find(theaction->GetNextPosition(s)) == past_positions.end()) {
+				//break; // we are not stuck, we have more options
+				#pragma omp cancel for
+			} else {
+				stuckcount++;
+			}
+		} else {
+			stuckcount++;
+		}
+	}
+
+	if (stuckcount == a.size()) {
+		return true;
+	}
+
+	return false;
+}
+
 //Call q function
 //An episode ends when an agent finds a success.
 //This is called episodic learning
@@ -109,8 +142,6 @@ vector<int> TakePathToPosition(vector<Action*> a, State mystate, int winningposi
 	map<int, int> past;
 	// srand needed for random_shuffle
 	srand(time(NULL));
-	bool stuck = false;
-	int stuckcount = 0;
 	double valuefunctionstateplusone = 0;
 	vector<int> retvec;
 
@@ -133,37 +164,9 @@ vector<int> TakePathToPosition(vector<Action*> a, State mystate, int winningposi
 			if (anaction->NextPositionValid(&mystate)) {
 				//dont move back to old position, but check if we are stuck
 				if (past.find(anaction->GetNextPosition(&mystate)) != past.end()) {
-					// TBD maybe move this logic into a class
-					/*
-						We need to check if the agent is stuck.
-						This means that we need to check if all possible next actions the agent takes
-						leads to a position that is not valid or already explored.
 
-						For example if our grid is:
-						1 2 3
-						4 5 6
-						And the agent has moved 1->2->5->4 then the agent is now stuck
-
-						If the agent is stuck we have to end the episode
-					*/
-					stuckcount = 0;
-					#pragma omp parallel for reduction(+ : stuckcount)
-					for (const auto theaction : a) { //loop through all actions
-						if (theaction->NextPositionValid(&mystate)) {
-							if (past.find(theaction->GetNextPosition(&mystate)) == past.end()) {
-								//break; // we are not stuck, we have more options
-								#pragma omp cancel for
-							} else {
-								stuckcount++;
-							}
-						} else {
-							stuckcount++;
-						}
-					}
-
-					if (stuckcount == a.size()) {
-						stuck = true;
-						break;
+					if (stuckChecker(past, &mystate, a)) {
+						return retvec;
 					}
 					
 					continue;
@@ -174,10 +177,6 @@ vector<int> TakePathToPosition(vector<Action*> a, State mystate, int winningposi
 				qmax = currentq;
 				takeaction = anaction;
 			}
-		}
-
-		if (stuck == true) {
-			break;
 		}
 
 		//Get the reward for that action
@@ -266,7 +265,8 @@ int main() {
 	MyTree ntree;
 	BuildTree(&ntree, av, &s, start);
 
-	cout << "All possible paths to position " << finish << ":" << endl;
+	//cout << "All possible paths to position " << finish << ":" << endl;
+	long unsigned int fewest_steps = 1000;
 	vector<vector<int>> mypaths = ntree.PathsToPosition(finish);
 	
 	for (const auto childvec : mypaths) {
@@ -274,8 +274,12 @@ int main() {
 		for (const auto child : childvec) {
 			pathtaken = pathtaken + " " + to_string(child);
 		}
-		cout << "Success:" << pathtaken << endl;
+		//cout << "Possible Path:" << pathtaken << endl;
+		if (childvec.size() < fewest_steps){
+			fewest_steps = childvec.size();
+		}
 	}
+	cout << "Fewest Path Steps:" << fewest_steps << endl;
 	
 	//Our goal here is to learn the q function q(s,a) where s is a state and a is an action
 	//lets create our q table
@@ -312,6 +316,10 @@ int main() {
 	cout << endl;
 	///////////////////////////////////////////////
 
-	PAUSE();
+	if (cp.size() == fewest_steps &&  cp.back()==finish){
+		cout << "Found optimal path!!!" << endl;
+	}
+
+	PAUSE(); // useful if using visual studio
 	return 0;
 }

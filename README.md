@@ -20,3 +20,7 @@ The value of a state under the optimal policy is the max of that state under any
 
 ### q function
 q(s,a) = (1-alpha) * q(s,a) + alpha * (r(s,a) + (Ymaxa,q(s',a'))) where (Ymaxa,q(s',a')) is the maximum amount of return based on the q table for an action. **The future is built into the equation through this.** r is the reward function.
+
+### TBD
+- Ability to save the Q table and reload it in order to skip training.
+- Format Q table output
