@@ -2,6 +2,7 @@
 *.aux
 *.log
 *.fls
+*.out
 
 ## Build tool auxiliary files:
 *.fdb_latexmk
