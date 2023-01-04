@@ -19,7 +19,7 @@ We want to create an optimal value function for each state in this world. We cal
 The value of a state under the optimal policy is the max of that state under any policy. Optimal value of the state maximizes the reward that I get right away plus the optimal value of the state I end up in.
 
 ### q function
-$`q(s,a) = (1-alpha) * q(s,a) + alpha * (r(s,a) + (Ymaxa,q(s',a')))`$ where (Ymaxa,q(s',a')) is the maximum amount of return based on the q table for an action. **The future is built into the equation through this.** r is the reward function.
+$`q(s,a) = (1-\alpha) * q(s,a) + \alpha * (r(s,a) + (\gamma \text{ max}_a,q(s',a')))`$ where $`(\gamma \text{ max}_a,q(s',a'))`$ is the maximum amount of return based on the q table for an action. **The future is built into the equation through this.** r is the reward function.
 
 ### TBD
 - Ability to save the Q table and reload it in order to skip training.
