@@ -1,13 +1,17 @@
 \documentclass[12pt]{article}
 \usepackage{graphicx}
-
+\usepackage{hyperref}
+\usepackage{indentfirst}
+\usepackage{fancyvrb}
+\usepackage{float}
+\RequirePackage{amsmath,amsthm,amsfonts,amssymb}
 \begin{document}
 
 
 \textbf{Parallelizing Tabular Q-learning using OpenMP. Using a grid} 
 \centerline{\textbf{world as our Environment}}
 
-\centerline{DENNIS SHPITS (ds3922) APMA 4302 - Methods in Computational Science}
+\centerline{Author: DENNIS SHPITS}
 
 
 \section*{1. Introduction}
@@ -96,27 +100,32 @@ needed to be made on the grid world.
 
 \section*{5. q function}
 
-\centerline{$q(s,a) = (1-\alpha) * q(s,a) + \alpha * (r(s,a) + (\gamma \text{ max}_a,q(s',a')))$}
+$$q(s,a) = (1-\alpha) * q(s,a) + \alpha * (r(s,a) + (\gamma \text{ max}_a,q(s',a')))$$
 
-~\\~
 The q function has the future built into it. $\gamma \text{ max}_a,q(s',a'))$ is the
 maximum amount of return based on the q table for an action.
-
 You can find the q function call in the code. It looks like this:
 
-\begin{verbatim}
-qtable->find(mystate.CurrentPosition())->
-second.find(takeaction->GetName())->second 
-= ( (1- alpha) * qtable->
-find(mystate.CurrentPosition())->
-second.find(takeaction->GetName())->second) 
-+ (alpha * (reward + vprime));
-\end{verbatim}
+\begin{figure}[h]
+  \centering
+    \begin{BVerbatim}
+      qtable->find(mystate.CurrentPosition())->
+      second.find(takeaction->GetName())->second 
+      = ( (1- alpha) * qtable->
+      find(mystate.CurrentPosition())->
+      second.find(takeaction->GetName())->second) 
+      + (alpha * (reward + vprime));
+    \end{BVerbatim}
+\end{figure}
 
 You will notice our q table is of type:
-\begin{verbatim}
-map<int, map<string, double>>
-\end{verbatim}
+
+\begin{figure}[h]
+  \centering
+  \begin{BVerbatim}
+    map<int, map<string, double>>
+  \end{BVerbatim}
+\end{figure}
 
 The rows of the q table are all the cell identifiers from 1 to $n$. 
 The columns of the table are the actions. 
@@ -209,63 +218,64 @@ the repetitive trials. We perform 100 trials and record the
 optimal path hit ratio afterwards. We keep the ITERATIONS
 value high enough to ensure the agent is eventually "exploiting" a policy.
 
-\begin{center}
-\centering
-\begin{tabular}{|l|l|l|l|l|} 
-\hline
-Threads & Grid Size & Optimal Path Hit Ratio & Agent Start Cell & Winning Position  \\ 
-\hline
-1       & 10        & 0.43                   & 1                & 10                \\ 
-\hline
-10      & 10        & 0.83                   & 1                & 10                \\ 
-\hline
-20      & 10        & 0.85                   & 1                & 10                \\ 
-\hline
-30      & 10        & 0.84                   & 1                & 10                \\ 
-\hline
-40      & 10        & 0.80                   & 1                & 10                \\ 
-\hline
-50      & 10        & 0.90                   & 1                & 10                \\ 
-\hline
-1       & 20        & 0.21                   & 1                & 20                \\ 
-\hline
-10      & 20        & 0.93                   & 1                & 20                \\ 
-\hline
-20      & 20        & 0.95                   & 1                & 20                \\ 
-\hline
-30      & 20        & 0.90                   & 1                & 20                \\ 
-\hline
-40      & 20        & 0.93                   & 1                & 20                \\ 
-\hline
-50      & 20        & 0.92                   & 1                & 20                \\ 
-\hline
-1       & 30        & 0.12                   & 1                & 30                \\ 
-\hline
-10      & 30        & 0.80                   & 1                & 30                \\ 
-\hline
-20      & 30        & 0.82                   & 1                & 30                \\ 
-\hline
-30      & 30        & 0.91                   & 1                & 30                \\ 
-\hline
-40      & 30        & 0.87                   & 1                & 30                \\ 
-\hline
-50      & 30        & 0.80                   & 1                & 30                \\ 
-\hline
-1       & 40        & 0.12                   & 1                & 40                \\ 
-\hline
-10      & 40        & 0.89                   & 1                & 40                \\ 
-\hline
-20      & 40        & 0.82                   & 1                & 40                \\ 
-\hline
-30      & 40        & 0.87                   & 1                & 40                \\ 
-\hline
-40      & 40        & 0.90                   & 1                & 40                \\ 
-\hline
-50      & 40        & 0.89                   & 1                & 40                \\
-\hline
-\end{tabular}
-\caption{Figure 1: Scalability Table}
-\end{center}
+\begin{table}[H]
+  \centering
+    \begin{tabular}{|l|l|l|l|l|}
+    \hline
+    Threads & Grid Size & Optimal Path Hit Ratio & Agent Start Cell & Winning Position  \\ 
+    \hline
+    1       & 10        & 0.43                   & 1                & 10                \\ 
+    \hline
+    10      & 10        & 0.83                   & 1                & 10                \\ 
+    \hline
+    20      & 10        & 0.85                   & 1                & 10                \\ 
+    \hline
+    30      & 10        & 0.84                   & 1                & 10                \\ 
+    \hline
+    40      & 10        & 0.80                   & 1                & 10                \\ 
+    \hline
+    50      & 10        & 0.90                   & 1                & 10                \\ 
+    \hline
+    1       & 20        & 0.21                   & 1                & 20                \\ 
+    \hline
+    10      & 20        & 0.93                   & 1                & 20                \\ 
+    \hline
+    20      & 20        & 0.95                   & 1                & 20                \\ 
+    \hline
+    30      & 20        & 0.90                   & 1                & 20                \\ 
+    \hline
+    40      & 20        & 0.93                   & 1                & 20                \\ 
+    \hline
+    50      & 20        & 0.92                   & 1                & 20                \\ 
+    \hline
+    1       & 30        & 0.12                   & 1                & 30                \\ 
+    \hline
+    10      & 30        & 0.80                   & 1                & 30                \\ 
+    \hline
+    20      & 30        & 0.82                   & 1                & 30                \\ 
+    \hline
+    30      & 30        & 0.91                   & 1                & 30                \\ 
+    \hline
+    40      & 30        & 0.87                   & 1                & 30                \\ 
+    \hline
+    50      & 30        & 0.80                   & 1                & 30                \\ 
+    \hline
+    1       & 40        & 0.12                   & 1                & 40                \\ 
+    \hline
+    10      & 40        & 0.89                   & 1                & 40                \\ 
+    \hline
+    20      & 40        & 0.82                   & 1                & 40                \\ 
+    \hline
+    30      & 40        & 0.87                   & 1                & 40                \\ 
+    \hline
+    40      & 40        & 0.90                   & 1                & 40                \\ 
+    \hline
+    50      & 40        & 0.89                   & 1                & 40                \\
+    \hline
+    \end{tabular}
+  \caption{Figure 1: Scalability Table}
+\end{table}
+
 
 We can see from the table that our RL program can handle
 increasing workload size. Adding threads improves outcome because we are essentially adding random exploration. I would argue that our RL
@@ -282,11 +292,12 @@ branch in the tree is a unique combination of actions that either
 leads to a winning position, or a "stuck" position.
 
 \section*{7. Version Control}
-All of the code used can be found on github:
+
+\noindent All of the code used can be found on github:
 
 \url{https://github.com/dennisshpits/ToyQLearning}
 
-We used github to encourage other developers to make contributions
+\noindent We used github to encourage other developers to make contributions
 to our RL project. If someone is very inquisitive, the specific
 commit where we added OpenMP can be found here:
 
@@ -308,8 +319,10 @@ leads to a faster algorithm.
 \centerline{REFERENCES}
 
 [1] Matei Ciocarlie, \textit{An Introduction to Deep RL from a Robotics Perspective},
-
 Columbia Engineering short course, Summer 2020
+
+[2] \textit{APMA 4302 - Methods in Computational Science},
+Columbia Engineering course, Fall 2021
 
 
 \end{document}
